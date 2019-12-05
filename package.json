@@ -1,0 +1,51 @@
+{
+  "name": "@kingga/kc-db",
+  "version": "1.0.0",
+  "description": "A fluent database inspired by Laravels eloquent database.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": "https://github.com/kingga/kc-db",
+  "author": "Isaac Skelton <contact@isaacskelton.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@kingga/kc-config": "^1.0.0",
+    "@kingga/kc-container": "^1.0.3",
+    "express": "^4.17.1",
+    "mysql": "^2.17.1",
+    "mysql2": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.5",
+    "@types/mocha": "^5.2.7",
+    "@types/mysql": "^2.15.8",
+    "chai": "^4.2.0",
+    "mocha": "^6.2.2",
+    "nyc": "^14.1.1",
+    "ts-loader": "^6.2.1",
+    "ts-node": "^8.5.2",
+    "typescript": "^3.7.2",
+    "webpack": "^4.41.2",
+    "webpack-cli": "^3.3.10"
+  },
+  "scripts": {
+    "test": "nyc mocha 'tests/**/*.ts' --require ts-node/register",
+    "start": "tsc && node dist/index.js"
+  },
+  "nyc": {
+    "extension": [
+      ".ts",
+      ".tsx"
+    ],
+    "include": [
+      "src/**/*"
+    ],
+    "exclude": [
+      "**/*/*.d.ts",
+      "src/contracts/**/*.ts"
+    ],
+    "reporter": [
+      "text"
+    ],
+    "all": true
+  }
+}
