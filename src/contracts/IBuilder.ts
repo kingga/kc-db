@@ -1,24 +1,26 @@
-export type WhereCondition = '=' | '<=>' | '>' | '>=' | '<' | '<=' | 'LIKE' | 'NOT LIKE' | '!=' | '<>';
-export type WhereValue = string | number | null;
+import { IDatabase } from './IDatabase';
+
+export type ConditionType = '=' | '<=>' | '>' | '>=' | '<' | '<=' | 'LIKE' | 'NOT LIKE' | '!=' | '<>';
+export type ValueTypes = string | number | null;
 export type OrderDirection = 'DESC' | 'ASC';
 
 export interface IWhereBuilder<T> {
-  where(column: string, condition: WhereCondition, value: WhereValue): T;
+  where(column: string, condition: ConditionType, value: ValueTypes): T;
   whereNull(column: string): T;
   whereNotNull(column: string): T;
-  whereIn(column: string, values: WhereValue[]): T;
-  whereNotIn(column: string, values: WhereValue[]): T;
-  whereBetween(column: string, from: WhereValue, to: WhereValue): T;
-  whereNotBetween(column: string, from: WhereValue, to: WhereValue): T;
+  whereIn(column: string, values: ValueTypes[]): T;
+  whereNotIn(column: string, values: ValueTypes[]): T;
+  whereBetween(column: string, from: ValueTypes, to: ValueTypes): T;
+  whereNotBetween(column: string, from: ValueTypes, to: ValueTypes): T;
   whereLike(column: string, value: string): T;
   whereNotLike(column: string, value: string): T;
-  orWhere(column: string, condition: WhereCondition, value: WhereValue): T;
+  orWhere(column: string, condition: ConditionType, value: ValueTypes): T;
   orWhereNull(column: string): T;
   orWhereNotNull(column: string): T;
-  orWhereIn(column: string, values: WhereValue[]): T;
-  orWhereNotIn(column: string, values: WhereValue[]): T;
-  orWhereBetween(column: string, from: WhereValue, to: WhereValue): T;
-  orWhereNotBetween(column: string, from: WhereValue, to: WhereValue): T;
+  orWhereIn(column: string, values: ValueTypes[]): T;
+  orWhereNotIn(column: string, values: ValueTypes[]): T;
+  orWhereBetween(column: string, from: ValueTypes, to: ValueTypes): T;
+  orWhereNotBetween(column: string, from: ValueTypes, to: ValueTypes): T;
   orWhereLike(column: string, value: string): T;
   orWhereNotLike(column: string, value: string): T;
   whereRaw(raw: string): T;
@@ -26,22 +28,25 @@ export interface IWhereBuilder<T> {
 }
 
 export interface IJoinBuilder extends IWhereBuilder<IJoinBuilder> {
-  on(columnA: string, condition: WhereCondition, columnB: string): IJoinBuilder;
-  toSql(): string;
+  on(columnA: string, condition: ConditionType, columnB: string): IJoinBuilder;
+  toSql(query: BindedQuery): void;
 }
 
 export type JoinCallable = (join: IJoinBuilder) => void;
 
+export interface BindedQuery {
+  sql: string;
+  bindings: any[];
+}
+
 export interface IBuilder extends IWhereBuilder<IBuilder> {
-  // General.
   table(table: string): IBuilder;
-  query<T>(query: string): Promise<T[]>;
 
   // Select.
   distinct(): IBuilder;
   groupBy(column: string): IBuilder;
   orderBy(column: string, direction: OrderDirection): IBuilder;
-  having(column: string, condition: WhereCondition, value: WhereValue): IBuilder;
+  having(column: string, condition: ConditionType, value: ValueTypes): IBuilder;
   havingRaw(raw: string): IBuilder;
   limit(count: number, offset?: number): IBuilder;
   select(columns: string[]): IBuilder;
@@ -50,25 +55,25 @@ export interface IBuilder extends IWhereBuilder<IBuilder> {
   first<T extends object>(columns?: string[]): Promise<T | null>;
 
   // Joins.
-  join(table: string, columnA: string, condition: WhereCondition, columnB: string): IBuilder;
+  join(table: string, columnA: string, condition: ConditionType, columnB: string): IBuilder;
   join(table: string, join: JoinCallable): IBuilder;
-  innerJoin(table: string, columnA: string, condition: WhereCondition, columnB: string): IBuilder;
+  innerJoin(table: string, columnA: string, condition: ConditionType, columnB: string): IBuilder;
   innerJoin(table: string, join: JoinCallable): IBuilder;
-  leftJoin(table: string, columnA: string, condition: WhereCondition, columnB: string): IBuilder;
+  leftJoin(table: string, columnA: string, condition: ConditionType, columnB: string): IBuilder;
   leftJoin(table: string, join: JoinCallable): IBuilder;
-  rightJoin(table: string, columnA: string, condition: WhereCondition, columnB: string): IBuilder;
+  rightJoin(table: string, columnA: string, condition: ConditionType, columnB: string): IBuilder;
   rightJoin(table: string, join: JoinCallable): IBuilder;
   crossJoin(table: string): IBuilder;
 
   // Insert.
-  insert<T extends Record<string, WhereValue>>(data: T[]): Promise<void>;
-  insertGetId<T extends Record<string, WhereValue>>(data: T): Promise<number>;
+  insert<T extends Record<string, ValueTypes>>(data: T[]): Promise<void>;
+  insertGetId<T extends Record<string, ValueTypes>>(data: T): Promise<number>;
 
   // Delete.
   delete(): Promise<void>;
 
   // Update.
-  update<T extends Record<string, WhereValue>>(values: T): Promise<void>;
+  update<T extends Record<string, ValueTypes>>(values: T): Promise<void>;
 
   // Aggregates.
   count(column?: string): Promise<number>;

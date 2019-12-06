@@ -1,4 +1,4 @@
-import { WhereCondition, JoinCallable } from '../../contracts/IBuilder';
+import { ConditionType, JoinCallable, BindedQuery } from '../../contracts/IBuilder';
 
 export type JoinType = 'INNER' | 'LEFT' | 'RIGHT';
 
@@ -6,7 +6,7 @@ export interface JoinInfo {
   type: JoinType;
   table: string;
   columnA: string;
-  condition: WhereCondition;
+  condition: ConditionType;
   columnB: string;
 }
 
@@ -17,5 +17,5 @@ export interface CallableJoinInfo {
 }
 
 export interface IJoin {
-  toSql(): string;
+  toSql(query: BindedQuery): void;
 }

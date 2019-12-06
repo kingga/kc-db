@@ -1,5 +1,5 @@
-import { escape } from 'mysql';
-import { WhereValue } from './contracts/IBuilder';
+import { escape } from 'mysql2/promise';
+import { ValueTypes } from './contracts/IBuilder';
 
 export function escapeColumn(column: string): string {
   // If there is a dot in the column split it into two.
@@ -24,11 +24,11 @@ export function escapeColumn(column: string): string {
   return `\`${column}\``;
 }
 
-export function escapeValue(value: WhereValue): WhereValue {
+export function escapeValue(value: ValueTypes): ValueTypes {
   return escape(value);
 }
 
-export function escapeValues(values: WhereValue[]): WhereValue[] {
+export function escapeValues(values: ValueTypes[]): ValueTypes[] {
   return values.map((value) => escapeValue(value));
 }
 

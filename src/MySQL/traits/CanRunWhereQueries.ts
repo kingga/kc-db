@@ -1,4 +1,4 @@
-import { WhereCondition, WhereValue, IWhereBuilder } from '../../contracts/IBuilder';
+import { ConditionType, ValueTypes, IWhereBuilder } from '../../contracts/IBuilder';
 import { escapeColumn, escapeValue, escapeValues } from '../../escape';
 import { IRaw } from '../../contracts/IRaw';
 import { WhereClause } from '../contracts/Types';
@@ -16,7 +16,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param condition The type of condition to evaluate.
    * @param value The value to evaluate the column against.
    */
-  public where(column: string, condition: WhereCondition, value: WhereValue): T {
+  public where(column: string, condition: ConditionType, value: ValueTypes): T {
     if (value === null) {
       return this.whereNull(column);
     }
@@ -32,7 +32,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param condition The type of condition to evaluate.
    * @param value The value to evaluate the column against.
    */
-  public orWhere(column: string, condition: WhereCondition, value: WhereValue): T {
+  public orWhere(column: string, condition: ConditionType, value: ValueTypes): T {
     if (value === null) {
       return this.whereNull(column);
     }
@@ -79,7 +79,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param column The name of the column.
    * @param values The values to evaluate the column against.
    */
-  public whereIn(column: string, values: WhereValue[]): T {
+  public whereIn(column: string, values: ValueTypes[]): T {
     return this.whereRaw(`${escapeColumn(column)} IN (${escapeValues(values).join(',')})`);
   }
 
@@ -88,7 +88,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param column The name of the column.
    * @param values The values to evaluate the column against.
    */
-  public orWhereIn(column: string, values: WhereValue[]): T {
+  public orWhereIn(column: string, values: ValueTypes[]): T {
     return this.orWhereRaw(`${escapeColumn(column)} IN (${escapeValues(values).join(',')})`);
   }
 
@@ -97,7 +97,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param column The name of the column.
    * @param values The values to evaluate the column against.
    */
-  public whereNotIn(column: string, values: WhereValue[]): T {
+  public whereNotIn(column: string, values: ValueTypes[]): T {
     return this.whereRaw(`${escapeColumn(column)} NOT IN (${escapeValues(values).join(',')})`);
   }
 
@@ -106,7 +106,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param column The name of the column.
    * @param values The values to evaluate the column against.
    */
-  public orWhereNotIn(column: string, values: WhereValue[]): T {
+  public orWhereNotIn(column: string, values: ValueTypes[]): T {
     return this.orWhereRaw(`${escapeColumn(column)} NOT IN (${escapeValues(values).join(',')})`);
   }
 
@@ -116,7 +116,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param from The lowest value in the range.
    * @param to The highest value in the range.
    */
-  public whereBetween(column: string, from: WhereValue, to: WhereValue): T {
+  public whereBetween(column: string, from: ValueTypes, to: ValueTypes): T {
     return this.whereRaw(`${escapeColumn(column)} BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
@@ -126,7 +126,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param from The lowest value in the range.
    * @param to The highest value in the range.
    */
-  public orWhereBetween(column: string, from: WhereValue, to: WhereValue): T {
+  public orWhereBetween(column: string, from: ValueTypes, to: ValueTypes): T {
     return this.orWhereRaw(`${escapeColumn(column)} BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
@@ -136,7 +136,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param from The lowest value in the range.
    * @param to The highest value in the range.
    */
-  public whereNotBetween(column: string, from: WhereValue, to: WhereValue): T {
+  public whereNotBetween(column: string, from: ValueTypes, to: ValueTypes): T {
     return this.whereRaw(`${escapeColumn(column)} NOT BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
@@ -146,7 +146,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    * @param from The lowest value in the range.
    * @param to The highest value in the range.
    */
-  public orWhereNotBetween(column: string, from: WhereValue, to: WhereValue): T {
+  public orWhereNotBetween(column: string, from: ValueTypes, to: ValueTypes): T {
     return this.orWhereRaw(`${escapeColumn(column)} NOT BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 

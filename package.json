@@ -18,6 +18,7 @@
     "@types/chai": "^4.2.5",
     "@types/mocha": "^5.2.7",
     "@types/mysql": "^2.15.8",
+    "@types/mysql2": "types/mysql2",
     "chai": "^4.2.0",
     "mocha": "^6.2.2",
     "nyc": "^14.1.1",

@@ -1,4 +1,4 @@
-import * as mysql from 'mysql';
+import * as mysql from 'mysql2/promise';
 import { IConfig, NonPersistentConfig } from '@kingga/kc-config';
 import Container from '@kingga/kc-container';
 
@@ -18,15 +18,7 @@ export function getConfig(): IConfig {
 }
 
 export async function createDb(config?: IConfig): Promise<mysql.Connection> {
-  return new Promise((resolve, reject) => {
-    const con = mysql.createConnection(config || getConfig().get('db'));
+  const con = await mysql.createConnection(config || getConfig().get('db'));
 
-    con.connect({}, (err) => {
-      if (err) {
-        return reject(err);
-      }
-
-      resolve(con);
-    });
-  });
+  return con;
 }

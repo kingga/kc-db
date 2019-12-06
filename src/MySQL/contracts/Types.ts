@@ -1,11 +1,11 @@
-import { WhereCondition, WhereValue, OrderDirection } from '../../contracts/IBuilder';
+import { ConditionType, ValueTypes, OrderDirection } from '../../contracts/IBuilder';
 
 export type WhereJoin = 'AND' | 'OR';
 
 export interface WhereClause {
   column: string;
-  condition: WhereCondition;
-  value: WhereValue;
+  condition: ConditionType;
+  value: ValueTypes;
   join?: WhereJoin;
 }
 
@@ -21,6 +21,6 @@ export interface Limit {
 
 export interface HavingClause {
   column: string;
-  condition: WhereCondition;
-  value: WhereValue;
+  condition: ConditionType;
+  value: ValueTypes;
 }

@@ -121,7 +121,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
       const [roleCount, userCount, avg] = await Promise.all([p1, p2, p3]);
 
-      expect(avg).to.equal(roleCount / userCount);
+      expect(avg).to.closeTo(roleCount / userCount, 0.0);
     });
 
     it('can get the sum of donations', async () => {

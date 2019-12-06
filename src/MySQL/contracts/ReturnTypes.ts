@@ -1,8 +1,8 @@
-import { FieldInfo } from 'mysql';
+import { FieldPacket } from 'mysql2/promise';
 
 export interface InternalQueryReturnType<T> {
   results: T;
-  fields?: FieldInfo[];
+  fields?: FieldPacket[];
 }
 
 export interface AggregatedResult<T> {
