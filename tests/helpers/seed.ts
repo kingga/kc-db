@@ -4,14 +4,13 @@ async function cleanDb(): Promise<void> {
   const db = await createDb();
   const [tables]: any = await db.query('SELECT table_name FROM information_schema.tables WHERE table_schema = ?;', ['kc_db']);
 
-  await db.query('SET FOREIGN_KEY_CHECKS = 0;')
+  await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
   for (const table of tables) {
-    await db.query(`DROP TABLE IF EXISTS ${table.TABLE_NAME};`)
+    await db.query(`DROP TABLE IF EXISTS ${table.table_name};`);
   }
 
-  await db.query('SET FOREIGN_KEY_CHECKS = 1;')
-
+  await db.query('SET FOREIGN_KEY_CHECKS = 1;');
   await db.end();
 }
 
@@ -110,10 +109,10 @@ export async function seed(): Promise<null> {
   await createUser({ name: 'John Doe', email: 'john.d@example.com', role_id: 3 });
   await createUser({ name: 'Joe King', email: 'joe.k@example.com', role_id: 4 });
 
-  await createDonation(2, 4000);
-  await createDonation(2, 1000);
-  await createDonation(1, 2.5);
-  await createDonation(1, 7.5);
+  await createDonation(1, 1000);
+  await createDonation(3, 7.5);
+  await createDonation(1, 4000);
+  await createDonation(3, 2.5);
 
   return new Promise((resolve) => resolve());
 }

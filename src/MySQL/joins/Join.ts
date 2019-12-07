@@ -1,7 +1,7 @@
-import { IJoin, JoinInfo, CallableJoinInfo } from '../contracts/IJoin';
-import { escapeTable, escapeColumn } from '../../escape';
+import { CallableJoinInfo, IJoin, JoinInfo } from '../../contracts/IJoin';
+import { escapeColumn, escapeTable } from '../../escape';
+import { BindedQuery } from '../../types';
 import { JoinBuilder } from '../JoinBuilder';
-import { BindedQuery } from '../../contracts/IBuilder';
 
 export class Join implements IJoin {
   protected readonly join: JoinInfo | CallableJoinInfo;
@@ -14,39 +14,46 @@ export class Join implements IJoin {
       'You have done the impossible by reaching this point or you are a scrub using normal JS.';
   }
 
-  public toSql(query: BindedQuery): void {
+  public toSql(): BindedQuery {
     if ('join' in this.join) {
-      this.advancedJoinSql(query);
+      return this.advancedJoinSql();
     }
 
-    this.simpleJoinSql(query);
+    return this.simpleJoinSql();
   }
 
-  protected simpleJoinSql(query: BindedQuery): void {
+  protected simpleJoinSql(): BindedQuery {
     if ('columnA' in this.join) {
       const { type, table, columnA, condition, columnB } = this.join;
       const ec = escapeColumn;
       const et = escapeTable;
 
-      query.sql += `${type} JOIN ${et(table)} ON ${ec(columnA)} ${condition || '='} ${ec(columnB)}`;
+      return {
+        sql: `${type} JOIN ${et(table)} ON ${ec(columnA)} ${condition || '='} ${ec(columnB)}`,
+        bindings: [],
+      };
     } else if ('join' in this.join) {
-      return this.advancedJoinSql(query);
+      return this.advancedJoinSql();
     }
 
     throw new Error(this.importantMsg);
   }
 
-  protected advancedJoinSql(query: BindedQuery): void {
+  protected advancedJoinSql(): BindedQuery {
     if ('join' in this.join) {
       const { type, table, join } = this.join;
       const builder = new JoinBuilder();
       join(builder);
 
-      query.sql += `${type} JOIN ${escapeTable(table)} ON (`;
-      builder.toSql(query);
-      query.sql += ')';
+      const query = builder.toSql();
+      const sql = `${type} JOIN ${escapeTable(table)} ON (${query.sql})`;
+
+      return {
+        sql,
+        bindings: query.bindings,
+      };
     } else if ('columnA' in this.join) {
-      return this.simpleJoinSql(query);
+      return this.simpleJoinSql();
     }
 
     throw new Error(this.importantMsg);

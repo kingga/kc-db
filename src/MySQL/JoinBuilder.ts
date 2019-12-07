@@ -1,5 +1,6 @@
-import { IJoinBuilder, ConditionType } from '../contracts/IBuilder';
+import { IJoinBuilder } from '../contracts/IJoinBuilder';
 import { escapeColumn } from '../escape';
+import { BindedQuery, ConditionType } from '../types';
 import { CanRunWhereQueries } from './traits/CanRunWhereQueries';
 
 export class JoinBuilder extends CanRunWhereQueries<IJoinBuilder> implements IJoinBuilder {
@@ -9,7 +10,10 @@ export class JoinBuilder extends CanRunWhereQueries<IJoinBuilder> implements IJo
     return this;
   }
 
-  public toSql(): string {
-    return '';
+  public toSql(): BindedQuery {
+    return {
+      sql: '',
+      bindings: [],
+    };
   }
 }

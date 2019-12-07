@@ -1,5 +1,6 @@
 import { escape } from 'mysql2/promise';
-import { ValueTypes } from './contracts/IBuilder';
+
+import { ValueType } from './types';
 
 export function escapeColumn(column: string): string {
   // If there is a dot in the column split it into two.
@@ -24,11 +25,11 @@ export function escapeColumn(column: string): string {
   return `\`${column}\``;
 }
 
-export function escapeValue(value: ValueTypes): ValueTypes {
+export function escapeValue(value: ValueType): ValueType {
   return escape(value);
 }
 
-export function escapeValues(values: ValueTypes[]): ValueTypes[] {
+export function escapeValues(values: ValueType[]): ValueType[] {
   return values.map((value) => escapeValue(value));
 }
 

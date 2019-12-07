@@ -1,19 +1,21 @@
-import { MySQLBuilder } from '../src/MySQL/MySQLBuilder';
-import { IBuilder } from '../src/contracts/IBuilder';
 import { expect } from 'chai';
-import { IConfig } from '@kingga/kc-config';
-import { User, seed } from './helpers/seed';
-import { getConfig } from './helpers/connection';
 
-type BuilderConstructor<T> = new (config: IConfig) => T;
+import { IBuilder } from '../src/contracts/IBuilder';
+import { IDatabase } from '../src/contracts/IDatabase';
+import { Database } from '../src/Database';
+import { MySQLBuilder } from '../src/MySQL/MySQLBuilder';
+import { getConfig } from './helpers/connection';
+import { seed, User } from './helpers/seed';
+
+type BuilderConstructor = new (db: IDatabase) => IBuilder;
 
 interface UserRole {
   id: number;
   name: string;
 }
 
-function makeDB<T>(cls: BuilderConstructor<T>) {
-  return new cls(getConfig());
+function makeDB(cls?: BuilderConstructor): IDatabase {
+  return new Database(getConfig(), cls);
 }
 
 function getAllRoles(): UserRole[] {
@@ -26,20 +28,32 @@ function getAllRoles(): UserRole[] {
   ];
 }
 
-function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
+describe('Database', () => {
+  it('shoud be able to run a raw query.', async () => {
+    await seed();
+    const db = makeDB();
+    const users = await db.query<User>('SELECT `id`, `name` FROM `users` WHERE `id` = 1 LIMIT 1;');
+
+    expect(users[0].id).equals(1);
+    expect(users[0].name).equals('Isaac Skelton');
+  });
+
+  it('should be able to run a binded query.', async () => {
+    await seed();
+    const db = makeDB();
+    const users = await db.query<User>('SELECT `id`, `name` FROM `users` WHERE `id` = ? LIMIT ?;', [1, 1]);
+
+    expect(users).to.have.lengthOf(1);
+    expect(users[0].id).equals(1);
+    expect(users[0].name).equals('Isaac Skelton');
+  });
+});
+
+function run(cls: BuilderConstructor) {
   describe(cls.name, () => {
-    it('shoud be able to run a raw query.', async () => {
-      await seed();
-      const db = makeDB<T>(cls);
-      const users = await db.query<User>('SELECT `id`, `name` FROM `users` WHERE `id` = 1 LIMIT 1;');
-
-      expect(users[0].id).equals(1);
-      expect(users[0].name).equals('Isaac Skelton');
-    });
-
     it('should be able to run a simple select using the builder', async () => {
       await seed();
-      const db = makeDB<T>(cls);
+      const db = makeDB(cls);
       const users = await db.table('users').where('id', '=', 1).get<User>(['id', 'name']);
 
       expect(users[0].id).equals(1);
@@ -48,7 +62,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('should be able to run a simple select query and only return one result', async () => {
       await seed();
-      const db = makeDB<T>(cls);
+      const db = makeDB(cls);
       const user = await db.table('users').where('id', '=', 1).first<User>(['id', 'name']);
 
       expect((user || { id: 0 }).id).to.equal(1);
@@ -57,7 +71,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('should be able to build a complex query with select, where, order, having and limit', async () => {
       await seed();
-      const db = makeDB<T>(cls);
+      const db = makeDB(cls);
       const expected = [
         { id: 3, name: 'Joe Bloggs' },
         { id: 5, name: 'Joe King' },
@@ -80,7 +94,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get the count of roles using a group and count', async () => {
       await seed();
-      const db = makeDB<T>(cls);
+      const db = makeDB(cls);
       const count = await db.table('users AS u')
         .join('user_roles AS r', 'u.role_id', '=', 'r.id')
         .groupBy('r.id')
@@ -92,7 +106,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get the lowest amount spent by a user for donations', async () => {
       await seed();
-      const db = makeDB<T>(cls);
+      const db = makeDB(cls);
       const amount = await db.table('donations as d')
         .leftJoin('users AS u', 'u.id', '=', 'd.user_id')
         .min('d.amount');
@@ -102,7 +116,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get the highest amount spent by a user for donations', async () => {
       await seed();
-      const db = makeDB<T>(cls);
+      const db = makeDB(cls);
       const amount = await db.table('donations as d')
         .leftJoin('users AS u', 'u.id', '=', 'd.user_id')
         .max('d.amount');
@@ -112,9 +126,9 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get the average number of users per role', async () => {
       await seed();
-      const p1 = makeDB<T>(cls).table('user_roles').count();
-      const p2 = makeDB<T>(cls).table('users').count();
-      const p3 = makeDB<T>(cls).table('user_roles AS r')
+      const p1 = makeDB(cls).table('user_roles').count();
+      const p2 = makeDB(cls).table('users').count();
+      const p3 = makeDB(cls).table('user_roles AS r')
         .join('users AS u', 'u.role_id', '=', 'r.id')
         .groupBy('r.id')
         .avg('r.id');
@@ -126,14 +140,14 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get the sum of donations', async () => {
       await seed();
-      const sum = await makeDB<T>(cls).table('donations').sum('amount');
+      const sum = await makeDB(cls).table('donations').sum('amount');
 
       expect(sum).to.equal(5010);
     });
 
     it('can get all uses in a group of IDs', async () => {
       await seed();
-      const users = await makeDB<T>(cls).table('users')
+      const users = await makeDB(cls).table('users')
         .whereIn('id', [1, 2])
         .get<{ id: number }>(['id']);
 
@@ -143,7 +157,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('should throw an error if the column doesn\'t exist', (done) => {
       seed().then(() => {
-        makeDB<T>(cls).table('users').sum('amount')
+        makeDB(cls).table('users').sum('amount')
           .then(() => done(new Error('It did not throw an exception.')))
           .catch(() => done());
       });
@@ -151,7 +165,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get everything from the users table', async () => {
       await seed();
-      const user = await makeDB<T>(cls).table('users').where('id', '=', 1).first();
+      const user = await makeDB(cls).table('users').where('id', '=', 1).first();
 
       expect(user).to.contain({
         id: 1,
@@ -163,7 +177,7 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get the first role which has more than one user assigned to it', async () => {
       await seed();
-      const role = await makeDB<T>(cls).table('users AS u')
+      const role = await makeDB(cls).table('users AS u')
         .join('user_roles AS r', 'r.id', '=', 'u.role_id')
         .groupBy('r.id')
         .havingRaw('COUNT(r.id) > 1')
@@ -174,8 +188,8 @@ function run<T extends IBuilder>(cls: BuilderConstructor<T>) {
 
     it('can get all possible combinations of the first user with all of the roles', async () => {
       await seed();
-      const p1 = makeDB<T>(cls).table('users').first<{ name: string }>(['name']);
-      const p2 = makeDB<T>(cls).table('users AS u')
+      const p1 = makeDB(cls).table('users').first<{ name: string }>(['name']);
+      const p2 = makeDB(cls).table('users AS u')
         .crossJoin('user_roles AS r')
         .where('u.id', '=', 1)
         .get<{ userName: string, roleName: string }>(['u.name AS userName', 'r.name AS roleName']);

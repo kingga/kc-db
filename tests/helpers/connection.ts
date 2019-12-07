@@ -1,6 +1,6 @@
-import * as mysql from 'mysql2/promise';
 import { IConfig, NonPersistentConfig } from '@kingga/kc-config';
 import Container from '@kingga/kc-container';
+import * as mysql from 'mysql2/promise';
 
 export function getConfig(): IConfig {
   const container = new Container();

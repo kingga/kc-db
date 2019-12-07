@@ -1,17 +1,17 @@
-import { IDatabase } from './contracts/IDatabase';
 import { IConfig } from '@kingga/kc-config';
-import { IBuilder } from './contracts/IBuilder';
-import { MySQLBuilder } from './MySQL/MySQLBuilder';
-import { InternalQueryReturnType } from './MySQL/contracts/ReturnTypes';
 import * as mysql from 'mysql2/promise';
 
-type BuilderContructor = new (db: IDatabase) => IBuilder;
+import { IBuilder } from './contracts/IBuilder';
+import { IDatabase } from './contracts/IDatabase';
+import { MySQLBuilder } from './MySQL/MySQLBuilder';
+import { BuilderConstructor, InternalQueryReturnType, ValueType } from './types';
 
 export class Database implements IDatabase {
   protected config: IConfig;
-  protected builder: BuilderContructor;
 
-  public constructor(config: IConfig, builder?: BuilderContructor) {
+  protected builder: BuilderConstructor;
+
+  public constructor(config: IConfig, builder?: BuilderConstructor) {
     if (!config.get('db')) {
       throw new Error("The database configuration has not been loaded, please use the tag 'db'.");
     }
@@ -24,8 +24,8 @@ export class Database implements IDatabase {
     return new this.builder(this).table(table);
   }
 
-  public async query<T>(query: string, bindings: any[]): Promise<T> {
-    const { results } = await this.internalQuery<T>(query, bindings);
+  public async query<T>(query: string, bindings?: ValueType[]): Promise<T> {
+    const { results } = await this.internalQuery<T>(query, bindings || []);
 
     return results;
   }
@@ -39,9 +39,15 @@ export class Database implements IDatabase {
       port: this.config.get('db.port', 3306),
     });
 
-    const [results, fields] = await connection.query(query, bindings);
-    connection.end();
+    try {
+      const [results, fields] = await connection.query(query, bindings);
+      connection.end();
 
-    return { results, fields };
+      return { results, fields };
+    } catch (e) {
+      console.log({ query, bindings, e });
+      connection.end();
+      throw e;
+    }
   }
 }
