@@ -11,7 +11,7 @@ export interface IBuilder extends IWhereBuilder<IBuilder> {
   having(column: string, condition: ConditionType, value: ValueType): IBuilder;
   havingRaw(raw: string): IBuilder;
   limit(count: number, offset?: number): IBuilder;
-  select(columns: string[]): IBuilder;
+  select(columns: string[] | string): IBuilder;
   selectRaw(column: string): IBuilder;
   get<T extends object>(columns?: string[]): Promise<T[]>;
   first<T extends object>(columns?: string[]): Promise<T | null>;

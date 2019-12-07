@@ -32,8 +32,6 @@ export class Join implements IJoin {
         sql: `${type} JOIN ${et(table)} ON ${ec(columnA)} ${condition || '='} ${ec(columnB)}`,
         bindings: [],
       };
-    } else if ('join' in this.join) {
-      return this.advancedJoinSql();
     }
 
     throw new Error(this.importantMsg);
@@ -52,8 +50,6 @@ export class Join implements IJoin {
         sql,
         bindings: query.bindings,
       };
-    } else if ('columnA' in this.join) {
-      return this.simpleJoinSql();
     }
 
     throw new Error(this.importantMsg);

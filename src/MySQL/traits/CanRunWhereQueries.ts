@@ -34,7 +34,7 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
    */
   public orWhere(column: string, condition: ConditionType, value: ValueType): T {
     if (value === null) {
-      return this.whereNull(column);
+      return this.orWhereNull(column);
     }
 
     this.wheres.push({ column, condition, value, join: 'OR' });
@@ -84,7 +84,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} IN (${Array(values.length).fill('?').join(', ')})`,
       values
     );
-    // return this.whereRaw(`${escapeColumn(column)} IN (${escapeValues(values).join(',')})`);
   }
 
   /**
@@ -97,7 +96,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} IN (${Array(values.length).fill('?').join(', ')})`,
       values
     );
-    // return this.orWhereRaw(`${escapeColumn(column)} IN (${escapeValues(values).join(',')})`);
   }
 
   /**
@@ -110,7 +108,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} NOT IN (${Array(values.length).fill('?').join(', ')})`,
       values
     );
-    // return this.whereRaw(`${escapeColumn(column)} NOT IN (${escapeValues(values).join(',')})`);
   }
 
   /**
@@ -123,7 +120,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} NOT IN (${Array(values.length).fill('?').join(', ')})`,
       values
     );
-    // return this.orWhereRaw(`${escapeColumn(column)} NOT IN (${escapeValues(values).join(',')})`);
   }
 
   /**
@@ -137,7 +133,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} BETWEEN ? AND ?`,
       [from, to]
     );
-    // return this.whereRaw(`${escapeColumn(column)} BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
   /**
@@ -151,7 +146,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} BETWEEN ? AND ?`,
       [from, to]
     );
-    // return this.orWhereRaw(`${escapeColumn(column)} BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
   /**
@@ -165,7 +159,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} NOT BETWEEN ? AND ?`,
       [from, to]
     );
-    // return this.whereRaw(`${escapeColumn(column)} NOT BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
   /**
@@ -179,7 +172,6 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
       `${escapeColumn(column)} NOT BETWEEN ? AND ?`,
       [from, to]
     );
-    // return this.orWhereRaw(`${escapeColumn(column)} NOT BETWEEN ${escapeValue(from)} AND ${escapeValue(to)}`);
   }
 
   /**
@@ -263,6 +255,8 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
     let bindings: ValueType[] = [];
 
     this.wheres.forEach((where, index) => {
+      sql += ' ';
+
       if ('getStatement' in where) {
         // If this is the first where clause, remove the AND/OR from the beginning if it exists.
         let stmt = where.getStatement().trim();

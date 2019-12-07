@@ -45,7 +45,6 @@ export class Database implements IDatabase {
 
       return { results, fields };
     } catch (e) {
-      console.log({ query, bindings, e });
       connection.end();
       throw e;
     }

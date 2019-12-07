@@ -11,9 +11,6 @@ export class JoinBuilder extends CanRunWhereQueries<IJoinBuilder> implements IJo
   }
 
   public toSql(): BindedQuery {
-    return {
-      sql: '',
-      bindings: [],
-    };
+    return this.buildWhere();
   }
 }

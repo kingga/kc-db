@@ -55,7 +55,7 @@ async function createTables(): Promise<void> {
   await db.end();
 }
 
-interface UserDetails {
+export interface UserDetails {
   name: string;
   email: string;
   role_id: number;

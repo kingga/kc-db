@@ -28,6 +28,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
   protected havings: (HavingClause | IRaw)[];
   protected selectedColumns: string[];
   protected joins: IJoin[];
+  protected tableNotSet: string;
 
   public constructor(db: IDatabase) {
     super();
@@ -40,6 +41,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     this.selectedColumns = [];
     this.joins = [];
     this.db = db;
+    this.tableNotSet = 'The table is not set.';
   }
 
   public table(table: string): IBuilder {
@@ -184,12 +186,12 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     this.limit(1);
     const results = await this.get<T>(columns);
 
-    return results ? results[0] : null;
+    return results ? results[0] || null : null;
   }
 
   public async insertGetId<T extends Record<string, ValueType>>(data: T): Promise<number> {
     if (!this.baseTable) {
-      throw 'The table is not set.';
+      throw this.tableNotSet;
     }
 
     const columns = Object.keys(data).map((c) => escapeColumn(c));
@@ -198,7 +200,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
 
     const results = await this.db.query<{ insertId: number }>(sql, bindings);
 
-    return results ? results[0].insertId : -1;
+    return results && results[0] ? results[0].insertId : -1;
   }
 
   public async insert<T extends Record<string, ValueType>>(data: T[]): Promise<void> {
@@ -209,7 +211,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
 
   public async delete(): Promise<void> {
     if (!this.baseTable) {
-      throw 'The table is not set.';
+      throw this.tableNotSet;
     }
 
     let sql = `DELETE FROM ${this.baseTable} `;
@@ -224,7 +226,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
 
   public async update<T extends Record<string, ValueType>>(values: T): Promise<void> {
     if (!this.baseTable) {
-      throw 'The table is not set.';
+      throw this.tableNotSet;
     }
 
     let sql = `UPDATE ${this.baseTable} SET `;
