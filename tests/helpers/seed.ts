@@ -1,109 +1,61 @@
 import { createDb } from './connection';
 
-async function dropTables(tables: string[]): Promise<void> {
-  const db = await createDb();
-
-  return new Promise((resolve, reject) => {
-    const table = tables.shift();
-
-    db.query('SET FOREIGN_KEY_CHECKS = 0;', [], (err) => {
-      if (err) {
-        db.end();
-
-        return reject(err);
-      }
-
-      db.query(`DROP TABLE IF EXISTS ${table};`, [], (err) => {
-        if (err) {
-          return reject(err);
-        }
-
-        if (tables.length) {
-          dropTables(tables).then(resolve).catch(reject);
-        } else {
-          resolve();
-        }
-
-        db.end();
-      });
-    });
-  });
-}
-
 async function cleanDb(): Promise<void> {
   const db = await createDb();
+  const [tables]: any = await db.query('SELECT table_name FROM information_schema.tables WHERE table_schema = ?;', ['kc_db']);
 
-  return new Promise((resolve, reject) => {
-    db.query('SELECT table_name FROM information_schema.tables WHERE table_schema = \'kc_db\';', [], (err, results: { TABLE_NAME: string }[]) => {
-      if (err) {
-        return reject(err);
-      }
+  await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
-      dropTables(results.map((t) => t.TABLE_NAME)).then(resolve).catch(reject);
-    });
+  for (const table of tables) {
+    await db.query(`DROP TABLE IF EXISTS ${table.table_name};`);
+  }
 
-    db.end();
-  });
+  await db.query('SET FOREIGN_KEY_CHECKS = 1;');
+  await db.end();
 }
 
 async function createTables(): Promise<void> {
   const db = await createDb();
 
-  return new Promise((resolve, reject) => {
-    db.query(`
-    CREATE TABLE user_roles (
-      id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-      name VARCHAR(255) NOT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      deleted_at DATETIME NULL
-    );
-    `, [], (err) => {
-      if (err) {
-        return reject(err);
-      }
+  await db.query(`
+  CREATE TABLE user_roles (
+    id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL
+  );
+  `);
 
-      db.query(`
-      CREATE TABLE users (
-        id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        role_id BIGINT UNSIGNED NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME NULL,
-        CONSTRAINT fk_users_role_id FOREIGN KEY (role_id) REFERENCES user_roles (id) ON DELETE CASCADE ON UPDATE CASCADE
-      );
-      `, [], (err) => {
-        if (err) {
-          return reject(err);
-        }
+  await db.query(`
+  CREATE TABLE users (
+    id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    role_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    CONSTRAINT fk_users_role_id FOREIGN KEY (role_id) REFERENCES user_roles (id) ON DELETE CASCADE ON UPDATE CASCADE
+  );
+  `);
 
-        db.query(`
-        CREATE TABLE donations (
-          id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-          user_id BIGINT UNSIGNED NOT NULL,
-          amount FLOAT UNSIGNED NOT NULL,
-          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          deleted_at DATETIME NULL,
-          CONSTRAINT fk_donations_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
-        );
-        `, [], (err) => {
-          if (err) {
-            return reject(err);
-          }
+  await db.query(`
+  CREATE TABLE donations (
+    id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    amount FLOAT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    CONSTRAINT fk_donations_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+  );
+  `);
 
-          db.end();
-        });
-
-        resolve();
-      });
-    });
-  });
+  await db.end();
 }
 
-interface UserDetails {
+export interface UserDetails {
   name: string;
   email: string;
   role_id: number;
@@ -126,49 +78,20 @@ async function createUser(details: UserDetails): Promise<void> {
     values.push(`'${v.toString()}'`);
   }
 
-  return new Promise((resolve, reject) => {
-    db.query(`INSERT INTO users (${columns.join(', ')}) VALUES (${values.join(', ')})`, [], (err) => {
-      if (err) {
-        return reject(err);
-      }
-
-      resolve();
-    });
-
-    db.end();
-  });
+  await db.query(`INSERT INTO users (${columns.join(', ')}) VALUES (${values.join(', ')})`);
+  await db.end();
 }
 
 async function createDonation(userId: number, amount: number): Promise<void> {
   const db = await createDb();
-
-  return new Promise((resolve, reject) => {
-    db.query('INSERT INTO donations (user_id, amount) VALUES (?, ?);', [userId, amount], (err) => {
-      if (err) {
-        return reject(err);
-      }
-
-      resolve();
-    });
-
-    db.end();
-  });
+  await db.query('INSERT INTO donations (user_id, amount) VALUES (?, ?);', [userId, amount]);
+  await db.end();
 }
 
 async function createRole(name: string): Promise<void> {
   const db = await createDb();
-
-  return new Promise((resolve, reject) => {
-    db.query('INSERT INTO user_roles (name) VALUES (?);', [name], (err) => {
-      if (err) {
-        return reject(err);
-      }
-
-      resolve();
-    });
-
-    db.end();
-  });
+  await db.query('INSERT INTO user_roles (name) VALUES (?);', [name]);
+  await db.end();
 }
 
 export async function seed(): Promise<null> {
@@ -186,10 +109,10 @@ export async function seed(): Promise<null> {
   await createUser({ name: 'John Doe', email: 'john.d@example.com', role_id: 3 });
   await createUser({ name: 'Joe King', email: 'joe.k@example.com', role_id: 4 });
 
-  await createDonation(2, 4000);
-  await createDonation(2, 1000);
-  await createDonation(1, 2.5);
-  await createDonation(1, 7.5);
+  await createDonation(1, 1000);
+  await createDonation(3, 7.5);
+  await createDonation(1, 4000);
+  await createDonation(3, 2.5);
 
   return new Promise((resolve) => resolve());
 }

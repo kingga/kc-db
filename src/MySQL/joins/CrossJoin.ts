@@ -1,5 +1,6 @@
-import { IJoin } from '../contracts/IJoin';
+import { IJoin } from '../../contracts/IJoin';
 import { escapeTable } from '../../escape';
+import { BindedQuery } from '../../types';
 
 export class CrossJoin implements IJoin {
   protected table: string;
@@ -8,7 +9,10 @@ export class CrossJoin implements IJoin {
     this.table = table;
   }
 
-  public toSql(): string {
-    return `CROSS JOIN ${escapeTable(this.table)}`;
+  public toSql(): BindedQuery {
+    return {
+      sql: `CROSS JOIN ${escapeTable(this.table)}`,
+      bindings: [],
+    };
   }
 }

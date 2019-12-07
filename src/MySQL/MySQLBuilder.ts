@@ -1,17 +1,25 @@
-import { IBuilder, WhereCondition, WhereValue, OrderDirection, JoinCallable } from '../contracts/IBuilder';
+import { IBuilder } from '../contracts/IBuilder';
+import { IDatabase } from '../contracts/IDatabase';
+import { IJoin, JoinType } from '../contracts/IJoin';
 import { IRaw } from '../contracts/IRaw';
-import * as mysql from 'mysql';
-import { escapeValue, escapeColumn, escapeTable } from '../escape';
-import { IJoin, JoinType } from './contracts/IJoin';
-import { Join } from './joins/Join';
+import { escapeColumn, escapeTable } from '../escape';
+import {
+  AggregatedResult,
+  BindedQuery,
+  ConditionType,
+  HavingClause,
+  JoinCallable,
+  Limit,
+  OrderBy,
+  OrderDirection,
+  ValueType,
+} from '../types';
 import { CrossJoin } from './joins/CrossJoin';
+import { Join } from './joins/Join';
 import { CanRunWhereQueries } from './traits/CanRunWhereQueries';
-import { IConfig } from '@kingga/kc-config';
-import { InternalQueryReturnType, AggregatedResult } from './contracts/ReturnTypes';
-import { OrderBy, Limit, HavingClause } from './contracts/Types';
 
 export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuilder {
-  protected config: IConfig;
+  protected db: IDatabase;
   protected baseTable: string;
   protected isDistinct: boolean;
   protected groups: string[];
@@ -20,14 +28,10 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
   protected havings: (HavingClause | IRaw)[];
   protected selectedColumns: string[];
   protected joins: IJoin[];
+  protected tableNotSet: string;
 
-  public constructor(config: IConfig) {
-    if (!config.get('db')) {
-      throw new Error("The database configuration has not been loaded, please use the tag 'db'.");
-    }
-
+  public constructor(db: IDatabase) {
     super();
-    this.config = config;
     this.baseTable = '';
     this.isDistinct = false;
     this.groups = [];
@@ -36,51 +40,14 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     this.havings = [];
     this.selectedColumns = [];
     this.joins = [];
+    this.db = db;
+    this.tableNotSet = 'The table is not set.';
   }
 
   public table(table: string): IBuilder {
-    this.baseTable = table;
+    this.baseTable = escapeTable(table);
 
     return this;
-  }
-
-  public internalQuery<T>(query: string): Promise<InternalQueryReturnType<T>> {
-    console.log({ query });
-
-    return new Promise((resolve, reject) => {
-      const connection = mysql.createConnection({
-        host: this.config.get('db.host'),
-        user: this.config.get('db.user'),
-        password: this.config.get('db.password'),
-        database: this.config.get('db.database'),
-        port: this.config.get('db.port', 3306),
-      });
-
-      connection.connect({}, (error) => {
-        if (error) {
-          reject(error);
-        }
-      });
-
-      connection.query(query, (error, results, fields) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve({ results, fields });
-      });
-
-      connection.end();
-    });
-  }
-
-  public query<T>(query: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.internalQuery<T>(query)
-        .then(({ results }) => resolve(results))
-        .catch((error: mysql.MysqlError) => reject(error));
-    });
   }
 
   public distinct(): IBuilder {
@@ -101,7 +68,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     return this;
   }
 
-  public having(column: string, condition: WhereCondition, value: WhereValue): IBuilder {
+  public having(column: string, condition: ConditionType, value: ValueType): IBuilder {
     this.havings.push({ column, condition, value });
 
     return this;
@@ -137,14 +104,14 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     return this;
   }
 
-  public join(table: string, columnA: string | JoinCallable, condition?: WhereCondition, columnB?: string): IBuilder {
+  public join(table: string, columnA: string | JoinCallable, condition?: ConditionType, columnB?: string): IBuilder {
     return this.innerJoin(table, columnA, condition, columnB);
   }
 
   public innerJoin(
     table: string,
     columnA: string | JoinCallable,
-    condition?: WhereCondition,
+    condition?: ConditionType,
     columnB?: string,
   ): IBuilder {
     return this.createJoin('INNER', table, columnA, condition, columnB);
@@ -153,7 +120,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
   public leftJoin(
     table: string,
     columnA: string | JoinCallable,
-    condition?: WhereCondition,
+    condition?: ConditionType,
     columnB?: string,
   ): IBuilder {
     return this.createJoin('LEFT', table, columnA, condition, columnB);
@@ -162,7 +129,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
   public rightJoin(
     table: string,
     columnA: string | JoinCallable,
-    condition?: WhereCondition,
+    condition?: ConditionType,
     columnB?: string,
   ): IBuilder {
     return this.createJoin('RIGHT', table, columnA, condition, columnB);
@@ -172,7 +139,7 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     type: JoinType,
     table: string,
     columnA: string | JoinCallable,
-    condition?: WhereCondition,
+    condition?: ConditionType,
     columnB?: string,
   ): IBuilder {
     if (typeof columnA === 'string' && typeof condition === 'string' && typeof columnB === 'string') {
@@ -190,153 +157,141 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     return this;
   }
 
-  public get<T extends object>(columns?: string[]): Promise<T[]> {
-    return new Promise((resolve, reject) => {
-      if (columns && columns.length) {
-        this.select(columns);
-      }
+  public async get<T extends object>(columns?: string[]): Promise<T[]> {
+    if (columns && columns.length) {
+      this.select(columns);
+    }
 
-      let sql = this.buildSelects();
-      sql += this.buildConditionQuery();
-      sql += this.buildOrder();
-      sql += this.buildLimit();
+    let sql = '';
+    let bindings: ValueType[] = [];
 
-      if (sql.trim()) {
-        return this.internalQuery<T[]>(sql.trim())
-          .then(({ results }) => resolve(results))
-          .catch((error) => reject(error));
-      } else {
-        resolve();
-      }
-    });
+    const joins = this.buildJoins();
+    const conditions = this.buildConditionQuery();
+    const limit = this.buildLimit();
+
+    sql += this.buildSelects();
+    sql += this.buildTable();
+    sql += joins.sql;
+    bindings = [...bindings, ...joins.bindings];
+    sql += conditions.sql;
+    bindings = [...bindings, ...conditions.bindings];
+    sql += this.buildOrder();
+    sql += limit.sql;
+    bindings = [...bindings, ...limit.bindings];
+
+    return await this.db.query<T>(sql, bindings) || [];
   }
 
-  public first<T extends object>(columns?: string[]): Promise<T | null> {
+  public async first<T extends object>(columns?: string[]): Promise<T | null> {
     this.limit(1);
+    const results = await this.get<T>(columns);
 
-    return new Promise((resolve, reject) => {
-      this.get<T>(columns)
-        .then((results) => resolve(results[0] || null))
-        .catch((error) => reject(error));
-    });
+    return results ? results[0] || null : null;
   }
 
-  public insert<T extends Record<string, WhereValue>>(data: T[]): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Use these to decide when all of the inserts have finished.
-      const len = data.length;
-      let ctr = 0;
+  public async insertGetId<T extends Record<string, ValueType>>(data: T): Promise<number> {
+    if (!this.baseTable) {
+      throw this.tableNotSet;
+    }
 
-      data.forEach((insert) => {
-        this.insertGetId<T>(insert)
-          .then(() => {
-            ctr++;
+    const columns = Object.keys(data).map((c) => escapeColumn(c));
+    const sql = `INSERT INTO ${this.baseTable} (${columns.join(', ')}) VALUES (${Array(columns.length).fill('?').join(', ')})`;
+    const bindings = Object.values(data);
 
-            if (ctr === len) {
-              resolve();
-            }
-          })
-          .catch((error) => reject(error));
-      });
-    });
+    const results = await this.db.query<{ insertId: number }>(sql, bindings);
+
+    return results && results[0] ? results[0].insertId : -1;
   }
 
-  public insertGetId<T extends Record<string, WhereValue>>(data: T): Promise<number> {
-    return new Promise((resolve, reject) => {
-      if (!this.baseTable) {
-        return reject('The table is not set.');
-      }
-
-      const columns = Object.keys(data).map((c) => escapeColumn(c));
-      const values = Object.values(data).map((v) => escapeValue(v));
-
-      let sql = `INSERT INTO ${this.baseTable} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
-      sql += this.buildConditionQuery();
-
-      this.internalQuery<{ insertId: number }>(sql)
-        .then(({ results }) => resolve(results.insertId))
-        .catch((error) => reject(error));
-    });
+  public async insert<T extends Record<string, ValueType>>(data: T[]): Promise<void> {
+    for (const insert of data) {
+      await this.insertGetId<T>(insert);
+    }
   }
 
-  public delete(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.baseTable) {
-        return reject('The table is not set.');
-      }
+  public async delete(): Promise<void> {
+    if (!this.baseTable) {
+      throw this.tableNotSet;
+    }
 
-      this.query(`DELETE ${this.buildConditionQuery()}`)
-        .then(() => resolve())
-        .catch((error) => reject(error));
-    });
+    let sql = `DELETE FROM ${this.baseTable} `;
+    let bindings: ValueType[] = [];
+
+    const conditions = this.buildConditionQuery();
+    sql += conditions.sql;
+    bindings = [...bindings, ...conditions.bindings];
+
+    await this.db.query(sql, bindings);
   }
 
-  public update<T extends Record<string, WhereValue>>(values: T): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.baseTable) {
-        return reject('The table is not set.');
+  public async update<T extends Record<string, ValueType>>(values: T): Promise<void> {
+    if (!this.baseTable) {
+      throw this.tableNotSet;
+    }
+
+    let sql = `UPDATE ${this.baseTable} SET `;
+    let bindings: ValueType[] = [];
+    let first = true;
+
+    for (const [k, v] of Object.entries(values)) {
+      if (!first) {
+        sql += ' AND ';
       }
 
-      let sql = `UPDATE ${this.baseTable} SET `;
-      let first = true;
+      sql += `${escapeColumn(k)} = ?`;
+      bindings.push(v);
+      first = false;
+    }
 
-      for (const [k, v] of Object.entries(values)) {
-        if (!first) {
-          sql += ' AND ';
-        }
+    const conditions = this.buildConditionQuery();
+    sql += conditions.sql;
+    bindings = [...bindings, ...conditions.bindings];
 
-        sql += `${escapeColumn(k)} = ${escapeValue(v)}`;
-        first = false;
-      }
-
-      sql += this.buildConditionQuery();
-
-      this.query(sql)
-        .then(() => resolve())
-        .catch((error) => reject(error));
-    });
+    await this.db.query(sql, bindings);
   }
 
   public count(column?: string): Promise<number> {
-    return this.queryAggregate<number>('COUNT', 0, column);
+    return this.queryAggregate('COUNT', 0, column);
   }
 
   public min(column: string): Promise<number> {
-    return this.queryAggregate<number>('MIN', 0, column);
+    return this.queryAggregate('MIN', 0, column);
   }
 
   public max(column: string): Promise<number> {
-    return this.queryAggregate<number>('MAX', 0, column);
+    return this.queryAggregate('MAX', 0, column);
   }
 
   public avg(column: string): Promise<number> {
-    return this.queryAggregate<number>('AVG', 0, column);
+    return this.queryAggregate('AVG', 0, column);
   }
 
   public sum(column: string): Promise<number> {
-    return this.queryAggregate<number>('SUM', 0, column);
+    return this.queryAggregate('SUM', 0, column);
   }
 
-  protected queryAggregate<T>(func: string, defaultValue: T, column?: string): Promise<T> {
+  protected async queryAggregate(func: string, defaultValue: number, column?: string): Promise<number> {
     this.selectRaw(`${func.toUpperCase()}(${column ? escapeColumn(column) : '*'}) AS aggregate`);
+    const result = await this.first<AggregatedResult<string>>();
 
-    return new Promise((resolve, reject) => {
-      this.first<AggregatedResult<T>>()
-        .then((result) => resolve(result ? result.aggregate : defaultValue))
-        .catch((error) => reject(error));
-    });
+    return result ? parseFloat(result.aggregate) : defaultValue;
   }
 
   protected buildTable(): string {
-    return ` FROM ${escapeTable(this.baseTable)} `;
+    return ` FROM ${this.baseTable} `;
   }
 
-  protected buildWhere(): string {
+  protected buildWhere(): BindedQuery {
     if (this.wheres.length === 0) {
-      return '';
+      return { sql: '', bindings: [] };
     }
 
-    return ` WHERE ${super.buildWhere()}`;
+    const { sql, bindings } = super.buildWhere();
+
+    return {
+      sql: `WHERE ${sql}`,
+      bindings,
+    };
   }
 
   protected buildGroups(): string {
@@ -359,37 +314,58 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     return `${sql} `;
   }
 
-  protected buildLimit(): string {
+  protected buildLimit(): BindedQuery {
     if (!this.resultLimit) {
-      return '';
+      return { sql: '', bindings: [] };
     }
 
     const { count, offset } = this.resultLimit;
 
-    return ` LIMIT ${count} OFFSET ${offset} `;
+    return {
+      sql: ` LIMIT ? OFFSET ?`,
+      bindings: [count, offset],
+    };
   }
 
-  protected buildHavings(): string {
+  protected buildHavings(): BindedQuery {
     if (this.havings.length === 0) {
-      return '';
+      return { sql: '', bindings: [] };
     }
 
-    let sql = ' HAVING ';
+    let sql = 'HAVING ';
+    const bindings: ValueType[] = [];
 
     this.havings.forEach((having, index) => {
       if ('getStatement' in having) {
         sql += having.getStatement();
       } else {
         sql += index === 0 ? '' : 'AND ';
-        sql += ` ${having.column} ${having.condition} ${having.value} `;
+        sql += ` ${escapeColumn(having.column)} ${having.condition} ? `;
+        bindings.push(having.value);
       }
     });
 
-    return sql;
+    return {
+      sql: sql.trim(),
+      bindings,
+    };
   }
 
-  protected buildJoins(): string {
-    return this.joins.map((join) => join.toSql()).join(' ');
+  protected buildJoins(): BindedQuery {
+    let sql = '';
+    let bindings: ValueType[] = [];
+
+    for (const join of this.joins) {
+      const query = join.toSql();
+
+      sql += query.sql;
+      bindings = [...bindings, ...query.bindings];
+    }
+
+    return {
+      sql: sql.trim(),
+      bindings,
+    };
   }
 
   protected buildSelects(): string {
@@ -402,13 +378,17 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
     return `${sql} ${this.selectedColumns.join(', ')} `;
   }
 
-  protected buildConditionQuery(): string {
-    let sql = this.buildTable();
-    sql += this.buildJoins();
-    sql += this.buildWhere();
-    sql += this.buildGroups();
-    sql += this.buildHavings();
+  protected buildConditionQuery(): BindedQuery {
+    const query: BindedQuery = { sql: '', bindings: [] };
+    const where = this.buildWhere();
+    const havings = this.buildHavings();
 
-    return sql;
+    query.sql += where.sql;
+    query.bindings = [...query.bindings, ...where.bindings];
+    query.sql += ` ${this.buildGroups()}`;
+    query.sql += ` ${havings.sql}`;
+    query.bindings = [...query.bindings, ...havings.bindings];
+
+    return query;
   }
 }
