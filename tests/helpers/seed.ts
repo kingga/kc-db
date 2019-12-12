@@ -7,7 +7,9 @@ async function cleanDb(): Promise<void> {
   await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
   for (const table of tables) {
-    await db.query(`DROP TABLE IF EXISTS ${table.table_name};`);
+    const name = typeof table.TABLE_NAME === 'undefined' ? table.table_name : table.TABLE_NAME;
+
+    await db.query(`DROP TABLE IF EXISTS ${name};`);
   }
 
   await db.query('SET FOREIGN_KEY_CHECKS = 1;');

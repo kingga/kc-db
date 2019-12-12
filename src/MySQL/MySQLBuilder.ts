@@ -17,6 +17,7 @@ import {
 import { CrossJoin } from './joins/CrossJoin';
 import { Join } from './joins/Join';
 import { CanRunWhereQueries } from './traits/CanRunWhereQueries';
+import vsprintf from 'locutus/php/strings/vsprintf';
 
 export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuilder {
   protected db: IDatabase;
@@ -162,24 +163,9 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
       this.select(columns);
     }
 
-    let sql = '';
-    let bindings: ValueType[] = [];
+    const query = this.getStatement();
 
-    const joins = this.buildJoins();
-    const conditions = this.buildConditionQuery();
-    const limit = this.buildLimit();
-
-    sql += this.buildSelects();
-    sql += this.buildTable();
-    sql += joins.sql;
-    bindings = [...bindings, ...joins.bindings];
-    sql += conditions.sql;
-    bindings = [...bindings, ...conditions.bindings];
-    sql += this.buildOrder();
-    sql += limit.sql;
-    bindings = [...bindings, ...limit.bindings];
-
-    return await this.db.query<T>(sql, bindings) || [];
+    return await this.db.query<T>(query.getStatement(), query.bindings) || [];
   }
 
   public async first<T extends object>(columns?: string[]): Promise<T | null> {
@@ -268,6 +254,43 @@ export class MySQLBuilder extends CanRunWhereQueries<IBuilder> implements IBuild
 
   public sum(column: string): Promise<number> {
     return this.queryAggregate('SUM', 0, column);
+  }
+
+  public getBindings(): ValueType[] {
+    return [
+      ...this.buildJoins().bindings,
+      ...this.buildConditionQuery().bindings,
+      ...this.buildLimit().bindings,
+    ];
+  }
+
+  public getStatement(): IRaw {
+    let sql = '';
+
+    const joins = this.buildJoins();
+    const conditions = this.buildConditionQuery();
+    const limit = this.buildLimit();
+
+    sql += this.buildSelects();
+    sql += this.buildTable();
+    sql += joins.sql;
+    sql += conditions.sql;
+    sql += this.buildOrder();
+    sql += limit.sql;
+
+    return {
+      getStatement: () => sql,
+      bindings: this.getBindings(),
+    };
+  }
+
+  public toSql(): string {
+    const stmt = this.getStatement();
+    const sql = stmt.getStatement()
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\?/g, "'%s'");
+
+    return vsprintf(sql, (stmt.bindings || [])).trim();
   }
 
   protected async queryAggregate(func: string, defaultValue: number, column?: string): Promise<number> {

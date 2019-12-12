@@ -4,6 +4,7 @@ import { MySQLBuilder } from '../src/MySQL/MySQLBuilder';
 import { BuilderConstructor } from '../src/types';
 import { makeDB } from './helpers/functions';
 import { seed, User } from './helpers/seed';
+import { IDatabase } from '../src/contracts/IDatabase';
 
 interface UserRole {
   id: number;
@@ -320,183 +321,260 @@ function run(cls: BuilderConstructor) {
 
       expect(count).to.equal(getAllRoles().length);
     });
-  });
 
-  it('can select single columns at a time and build it up', async () => {
-    await seed();
-    const db = makeDB(cls);
-    const user = await db.table('users')
-      .where('id', '=', 1)
-      .select('id')
-      .select('name')
-      .first<{ id: number, name: string }>();
+    it('can select single columns at a time and build it up', async () => {
+      await seed();
+      const db = makeDB(cls);
+      const user = await db.table('users')
+        .where('id', '=', 1)
+        .select('id')
+        .select('name')
+        .first<{ id: number, name: string }>();
 
-    expect(user).to.not.be.null;
+      expect(user).to.not.be.null;
 
-    if (user !== null) {
-      expect(user.id).to.equal(1);
-      expect(user.name).to.equal('Isaac Skelton');
-    }
-  });
-
-  it('can update with multiple conditions', async () => {
-    await seed();
-    const db = makeDB(cls);
-    await db.table('users')
-      .whereIn('id', [1, 2, 4])
-      .whereNotLike('name', 'J% Doe')
-      .update({ name: 'I M Skelton' });
-
-    const users = await db.table('users')
-      .whereIn('id', [1, 2, 4])
-      .get<{ id: number, name: string }>(['id', 'name']);
-
-    expect(users).to.have.lengthOf(3);
-
-    for (const { id, name } of users) {
-      if (id === 1) {
-        expect(name).to.equal('I M Skelton');
-      } else {
-        expect(name).to.not.equal('I M Skelton');
+      if (user !== null) {
+        expect(user.id).to.equal(1);
+        expect(user.name).to.equal('Isaac Skelton');
       }
-    }
-  });
+    });
 
-  it('can check if a column is null or not null', async () => {
-    await seed();
-    const db = makeDB();
-    const originalCount = await db.table('users').count();
-    await db.table('users')
-      .where('id', '=', 2)
-      .update({ deleted_at: '2019-12-07 17:45:40' });
+    it('can update with multiple conditions', async () => {
+      await seed();
+      const db = makeDB(cls);
+      await db.table('users')
+        .whereIn('id', [1, 2, 4])
+        .whereNotLike('name', 'J% Doe')
+        .update({ name: 'I M Skelton' });
 
-    const nn = db.table('users').whereNotNull('deleted_at').count();
-    const n = db.table('users').whereNull('deleted_at').count();
-    const onn = db.table('users').where('id', '=', 2).orWhereNotNull('deleted_at').count();
-    const on = db.table('users').where('id', '=', 2).orWhereNull('deleted_at').count();
-    const [nnCount, nCount, onnCount, onCount] = await Promise.all([nn, n, onn, on]);
+      const users = await db.table('users')
+        .whereIn('id', [1, 2, 4])
+        .get<{ id: number, name: string }>(['id', 'name']);
 
-    expect(nnCount).to.equal(1);
-    expect(nCount).to.equal(originalCount - 1);
-    expect(onnCount).to.equal(1);
-    expect(onCount).to.equal(originalCount);
-  });
+      expect(users).to.have.lengthOf(3);
 
-  it('can run raw where queries', async () => {
-    await seed();
-    const db = makeDB(cls);
+      for (const { id, name } of users) {
+        if (id === 1) {
+          expect(name).to.equal('I M Skelton');
+        } else {
+          expect(name).to.not.equal('I M Skelton');
+        }
+      }
+    });
 
-    const count = await db.table('users')
-      .whereRaw('FIND_IN_SET(id, "1,3")')
-      .orWhereRaw('FIND_IN_SET(id, "4,5")')
-      .count();
+    it('can check if a column is null or not null', async () => {
+      await seed();
+      const db = makeDB();
+      const originalCount = await db.table('users').count();
+      await db.table('users')
+        .where('id', '=', 2)
+        .update({ deleted_at: '2019-12-07 17:45:40' });
 
-    expect(count).to.equal(4);
-  });
+      const nn = db.table('users').whereNotNull('deleted_at').count();
+      const n = db.table('users').whereNull('deleted_at').count();
+      const onn = db.table('users').where('id', '=', 2).orWhereNotNull('deleted_at').count();
+      const on = db.table('users').where('id', '=', 2).orWhereNull('deleted_at').count();
+      const [nnCount, nCount, onnCount, onCount] = await Promise.all([nn, n, onn, on]);
 
-  it('can run a where not like query', async () => {
-    await seed();
-    const db = makeDB(cls);
+      expect(nnCount).to.equal(1);
+      expect(nCount).to.equal(originalCount - 1);
+      expect(onnCount).to.equal(1);
+      expect(onCount).to.equal(originalCount);
+    });
 
-    const count = await db.table('users')
-      .whereNotLike('name', 'J% Doe')
-      .whereNotLike('name', 'Joe %')
-      .count();
+    it('can run raw where queries', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    const count2 = await db.table('users')
-      .where('id', '!=', 2)
-      .orWhereNotLike('name', 'I% Skelton')
-      .count();
+      const count = await db.table('users')
+        .whereRaw('FIND_IN_SET(id, "1,3")')
+        .orWhereRaw('FIND_IN_SET(id, "4,5")')
+        .count();
 
-    expect(count).to.equal(1);
-    expect(count2).to.equal(5);
-  });
+      expect(count).to.equal(4);
+    });
 
-  it('can run a simple query with no conditions attached', async () => {
-    await seed();
-    const db = makeDB(cls);
+    it('can run a where not like query', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    const count = await db.table('users').count();
+      const count = await db.table('users')
+        .whereNotLike('name', 'J% Doe')
+        .whereNotLike('name', 'Joe %')
+        .count();
 
-    expect(count).to.equal(5);
-  });
+      const count2 = await db.table('users')
+        .where('id', '!=', 2)
+        .orWhereNotLike('name', 'I% Skelton')
+        .count();
 
-  it('can get values between or not between two values', async () => {
-    await seed();
-    const db = makeDB(cls);
+      expect(count).to.equal(1);
+      expect(count2).to.equal(5);
+    });
 
-    const notBetween = db.table('users').whereNotBetween('id', 2, 5).count();
-    const between = db.table('users').whereBetween('id', 2, 5).count();
+    it('can run a simple query with no conditions attached', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    const orNotBetween = db.table('users')
-      .whereNotBetween('id', 1, 2)
-      .orWhereNotBetween('id', 2, 4)
-      .count();
+      const count = await db.table('users').count();
 
-    const orBetween = db.table('users')
-      .whereBetween('id', 1, 2)
-      .orWhereBetween('id', 4, 5)
-      .count();
+      expect(count).to.equal(5);
+    });
 
-    const [notBetweenCount, betweenCount, orNotBetweenCount, orBetweenCount] = await Promise.all([
-      notBetween,
-      between,
-      orNotBetween,
-      orBetween,
-    ]);
+    it('can get values between or not between two values', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    expect(notBetweenCount).to.equal(1);
-    expect(betweenCount).to.equal(4);
-    expect(orNotBetweenCount).to.equal(4);
-    expect(orBetweenCount).to.equal(4);
-  });
+      const notBetween = db.table('users').whereNotBetween('id', 2, 5).count();
+      const between = db.table('users').whereBetween('id', 2, 5).count();
 
-  it('can run a where not in query', async () => {
-    await seed();
-    const db = makeDB(cls);
+      const orNotBetween = db.table('users')
+        .whereNotBetween('id', 1, 2)
+        .orWhereNotBetween('id', 2, 4)
+        .count();
 
-    const notIn = db.table('users').whereNotIn('id', [2, 3, 4, 5]).count();
-    const orNotIn = db.table('users').whereNotIn('id', [2, 3]).orWhereNotIn('id', [3, 4]).count();
-    const [notInCount, orNotInCount] = await Promise.all([notIn, orNotIn]);
+      const orBetween = db.table('users')
+        .whereBetween('id', 1, 2)
+        .orWhereBetween('id', 4, 5)
+        .count();
 
-    expect(notInCount).to.equal(1);
-    expect(orNotInCount).to.equal(4);
-  });
+      const [notBetweenCount, betweenCount, orNotBetweenCount, orBetweenCount] = await Promise.all([
+        notBetween,
+        between,
+        orNotBetween,
+        orBetween,
+      ]);
 
-  it('can convert NULL value into whereNull if passed into or where', async () => {
-    await seed();
-    const db = makeDB(cls);
+      expect(notBetweenCount).to.equal(1);
+      expect(betweenCount).to.equal(4);
+      expect(orNotBetweenCount).to.equal(4);
+      expect(orBetweenCount).to.equal(4);
+    });
 
-    const count = await db.table('users')
-      .where('id', '=', 1)
-      .orWhere('deleted_at', '=', null)
-      .count();
+    it('can run a where not in query', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    expect(count).to.equal(5);
-  });
+      const notIn = db.table('users').whereNotIn('id', [2, 3, 4, 5]).count();
+      const orNotIn = db.table('users').whereNotIn('id', [2, 3]).orWhereNotIn('id', [3, 4]).count();
+      const [notInCount, orNotInCount] = await Promise.all([notIn, orNotIn]);
 
-  it('can run a or where query', async () => {
-    await seed();
-    const db = makeDB(cls);
+      expect(notInCount).to.equal(1);
+      expect(orNotInCount).to.equal(4);
+    });
 
-    const count = await db.table('users')
-      .where('id', '=', 1)
-      .orWhere('id', '=', 2)
-      .count();
+    it('can convert NULL value into whereNull if passed into or where', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    expect(count).to.equal(2);
-  });
+      const count = await db.table('users')
+        .where('id', '=', 1)
+        .orWhere('deleted_at', '=', null)
+        .count();
 
-  it('can run a or where in query', async () => {
-    await seed();
-    const db = makeDB(cls);
+      expect(count).to.equal(5);
+    });
 
-    const count = await db.table('users')
-      .where('id', '=', 1)
-      .orWhereIn('id', [3, 4])
-      .count();
+    it('can run a or where query', async () => {
+      await seed();
+      const db = makeDB(cls);
 
-    expect(count).to.equal(3);
+      const count = await db.table('users')
+        .where('id', '=', 1)
+        .orWhere('id', '=', 2)
+        .count();
+
+      expect(count).to.equal(2);
+    });
+
+    it('can run a or where in query', async () => {
+      await seed();
+      const db = makeDB(cls);
+
+      const count = await db.table('users')
+        .where('id', '=', 1)
+        .orWhereIn('id', [3, 4])
+        .count();
+
+      expect(count).to.equal(3);
+    });
+
+    it('can run a sub query condition', async () => {
+      await seed();
+      const db = makeDB(cls);
+      type User = { id: number, name: string };
+
+      const getBuilder = (db: IDatabase) => {
+        return db.table('donations AS d')
+          .where('amount', '=', 2.5)
+          .select('d.user_id')
+          .limit(1);
+      }
+
+      const p1 = db.table('users AS u')
+        .whereSub((db) => getBuilder(db))
+        .first<User>(['id', 'name']);
+
+      const p2 = db.table('users AS u')
+        .whereSub({
+          getStatement: () => 'SELECT d.user_id FROM donations AS d WHERE amount = ? LIMIT 1',
+          bindings: [2.5],
+        })
+        .first<User>(['id', 'name']);
+
+      const p3 = db.table('users AS u')
+        .whereSub(getBuilder(db))
+        .first<User>(['id', 'name']);
+
+      const [u1, u2, u3] = await Promise.all([p1, p2, p3]);
+
+      [u1, u2, u3].forEach((user) => {
+        expect(user).to.not.be.null;
+
+        if (user) {
+          expect(user.id).to.equal(1);
+          expect(user.name).to.equal('Isaac Skelton');
+        }
+      });
+    });
+
+    it('can run a where in sub query condition', async () => {
+      await seed();
+      const db = makeDB(cls);
+
+      const count = await db.table('users AS u')
+        .whereInSub('u.role_id', (db) => {
+          return db.table('user_roles AS r')
+            .where('r.id', '=', 2)
+            .orWhere('r.id', '=', 1)
+            .select('r.id');
+        })
+        .count();
+
+      expect(count).to.equal(3);
+    });
+
+    it('can generate sql for a variety of queries', () => {
+      const db = makeDB(cls);
+
+      const simple = db.table('users').select(['id', 'name']).toSql();
+
+      const singleCondition = db.table('users')
+        .where('role_id', '=', 2)
+        .select(['id', 'name'])
+        .toSql();
+
+      const conditions = db.table('users')
+        .where('role_id', '=', 2)
+        .whereLike('name', 'J% Bloggs')
+        .whereBetween('id', 1, 5)
+        .select(['id', 'name'])
+        .toSql();
+
+      expect(simple).to.equal('SELECT `id`, `name` FROM `users`');
+      expect(singleCondition).to.equal("SELECT `id`, `name` FROM `users` WHERE `role_id` = '2'");
+      expect(conditions).to.equal("SELECT `id`, `name` FROM `users` WHERE `role_id` = '2' AND `name` LIKE 'J% Bloggs' AND `id` BETWEEN '1' AND '5'");
+    });
   });
 }
 

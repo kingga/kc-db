@@ -11,11 +11,13 @@
     "@kingga/kc-config": "^1.0.0",
     "@kingga/kc-container": "^1.0.3",
     "express": "^4.17.1",
+    "locutus": "^2.0.11",
     "mysql": "^2.17.1",
     "mysql2": "^2.0.1"
   },
   "devDependencies": {
     "@types/chai": "^4.2.5",
+    "@types/locutus": "^0.0.5",
     "@types/mocha": "^5.2.7",
     "@types/mysql": "^2.15.8",
     "@types/mysql2": "types/mysql2",

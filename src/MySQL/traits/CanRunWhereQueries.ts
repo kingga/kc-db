@@ -2,8 +2,15 @@ import { IRaw } from '../../contracts/IRaw';
 import { IWhereBuilder } from '../../contracts/IWhereBuilder';
 import { escapeColumn } from '../../escape';
 import { BindedQuery, ConditionType, ValueType, WhereClause } from '../../types';
+import { SubQueryArg, IBuilder } from '../../contracts/IBuilder';
+import { Database } from '../../Database';
+import { MySQLBuilder } from '../MySQLBuilder';
+import { IJoinBuilder } from '../../contracts/IJoinBuilder';
+import { IDatabase } from '../../contracts/IDatabase';
+import { IConfig, NonPersistentConfig } from '@kingga/kc-config';
+import Container from '@kingga/kc-container';
 
-export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
+export abstract class CanRunWhereQueries<T extends IBuilder | IJoinBuilder> implements IWhereBuilder<T> {
   protected wheres: (WhereClause | IRaw)[];
 
   public constructor() {
@@ -244,6 +251,45 @@ export abstract class CanRunWhereQueries<T> implements IWhereBuilder<T> {
     });
 
     return (this as unknown) as T;
+  }
+
+  public whereSub(builder: SubQueryArg): T {
+    const stmt = this.buildSubQuery(builder);
+
+    this.wheres.push({
+      getStatement: () => `(${stmt.getStatement()})`,
+      bindings: stmt.bindings,
+    });
+
+    return (this as unknown) as T;
+  }
+
+  public whereInSub(column: string, builder: SubQueryArg): T {
+    const stmt = this.buildSubQuery(builder);
+
+    this.wheres.push({
+      getStatement: () => `${escapeColumn(column)} IN (${stmt.getStatement()})`,
+      bindings: stmt.bindings,
+    });
+
+    return (this as unknown) as T;
+  }
+
+  protected buildSubQuery(builder: SubQueryArg): IRaw {
+    let stmt: IRaw;
+
+    if (typeof builder === 'function') {
+      const config: IConfig = new NonPersistentConfig({ db: {} }, new Container());
+      const query = builder(new Database(config, MySQLBuilder));
+
+      stmt = query.getStatement();
+    } else if ('getStatement' in builder && 'bindings' in builder) {
+      stmt = builder;
+    } else {
+      stmt = (builder as IBuilder).getStatement();
+    }
+
+    return stmt;
   }
 
   protected buildWhere(): BindedQuery {
